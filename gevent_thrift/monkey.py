@@ -13,6 +13,6 @@
 # limitations under the License.
 
 def patch_thrift():
-    import gevent
+    import gevent.socket
     from thrift.transport import TSocket
     TSocket.socket = gevent.socket
