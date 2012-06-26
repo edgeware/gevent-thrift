@@ -19,7 +19,7 @@ from gevent.queue import Queue, Empty, Full
 from gevent import socket
 import gevent
 
-from circuit import CircuitBreaker, OpenCircuitError
+from circuit import CircuitBreaker, CircuitOpenError
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TTransport, TSocket
@@ -33,47 +33,57 @@ class _ConnectionPool(object):
     """A really simple connection pool."""
 
     def __init__(self, factory, pool_size=10):
-        self._queue = Queue(pool_size)
-        self._factory = factory
-        self._num_conn = 0
+        self.queue = Queue(pool_size)
+        self.maxsize = pool_size
+        self.factory = factory
+        self.size = 0
 
     def close(self):
         """Close down the pool."""
         while True:
             try:
-                conn = self._queue.get(False)
-                self._factory.dispose(conn)
+                conn = self.queue.get(False)
+                self.factory.dispose(conn)
             except Empty:
                 break
 
     def put(self, conn):
         """Put back a connection into the pool."""
-        try:
-            self._queue.put_nowait(conn)
-        except Full:
-            self._num_conn -= 1
-            self._factory.dispose(conn)
+        # This _should_ never raise Full since we have logic in get
+        # that forbids us from creating more than C{maxsize}
+        # connections. And all of those items fit in the queue.
+        self.queue.put_nowait(conn)
 
     def dispose(self, conn):
         """Connection is considered broken and should be disposed from
         the pool.
         """
-        self._num_conn -= 1
-        self._factory.dispose(conn)
+        self.size -= 1
+        self.factory.dispose(conn)
 
     def get(self, timeout):
-        """Try to get a connection from the pool."""
+        """Try to get a connection from the pool.
+
+        @param timeout: Time to wait for a connection.  Note that this
+           is not the same as the connection timeout that will be
+           triggered in the case of a connection timeout.
+
+        @raise gevent.Timeout: If a connection could not be snatched
+           from the pool within C{timeout} seconds.
+        """
         try:
-            block = self._num_conn >= self._queue.qsize()
-            conn = self._queue.get(block, timeout)
+            block = self.size >= self.maxsize
+            conn = self.queue.get(block, timeout)
         except Empty:
-            conn = self._factory.create()
-            self._num_conn += 1
+            if block:
+                raise gevent.Timeout(timeout)
+            conn = self.factory.create()
+            self.size += 1
         return conn
 
 
-class ConnectionContextManager(object):
-    """Context manager for a C{ConnectPool} that yields a connection
+class _ConnectionContextManager(object):
+    """Context manager for a C{_ConnectionPool} that yields a connection
     and takes care of error handling.
     """
 
@@ -94,6 +104,35 @@ class ConnectionContextManager(object):
             self.pool.put(self.conn)
 
 
+class GeventTSocket(TSocket.TSocket):
+    """A simple variant of L{TSocket.TSocket} that use our version of
+    the socket module rather than the stdlib one.
+    """
+
+    def _resolveAddr(self):
+        if self._unix_socket is not None:
+            return [(socket.AF_UNIX, socket.SOCK_STREAM,
+                     None, None, self._unix_socket)]
+        else:
+            return socket.getaddrinfo(self.host, self.port,
+                                      socket.AF_UNSPEC, socket.SOCK_STREAM, 0,
+                                      socket.AI_PASSIVE | socket.AI_ADDRCONFIG)
+
+    def open(self):
+        res0 = self._resolveAddr()
+        for res in res0:
+            self.handle = socket.socket(res[0], res[1])
+            self.handle.settimeout(self._timeout)
+            try:
+                self.handle.connect(res[4])
+            except socket.error, e:
+                if res is not res0[-1]:
+                    continue
+                else:
+                    raise e
+            break
+
+
 class _ConnectionFactory(object):
     """Factory that creates connections for a C{_ConnectionPool}.
 
@@ -107,10 +146,11 @@ class _ConnectionFactory(object):
         self.timeout = timeout
 
     def create(self):
-        stransport = TSocket.TSocket(self.host, self.port)
+        stransport = GeventTSocket(self.host, self.port)
         stransport.setTimeout(self.timeout * 1000)
         ftransport = TTransport.TFramedTransport(stransport)
         ftransport.open()
+        stransport.setTimeout(None)
         protocol = TBinaryProtocol.TBinaryProtocol(ftransport)
         return self.client_class(protocol)
 
@@ -143,7 +183,7 @@ class ThriftClient(object):
     """
 
     def __init__(self, clock, log, host, port, client_class,
-                 pool_timeout=0.100 connect_timeout=0.100, read_timeout=0.250,
+                 pool_timeout=0.100, connect_timeout=0.100, read_timeout=0.250,
                  psize=10, maxfail=3, reset_timeout=10,
                  time_unit=60, error_types=None):
         self.client_class = client_class
@@ -183,7 +223,8 @@ class ThriftClient(object):
         #   Thrift client class.
         #
         with self.breaker:
-            with ConnectionContextManager(pool, self.pool_timeout) as client:
+            with _ConnectionContextManager(self.pool, self.pool_timeout) \
+                   as client:
                 with gevent.Timeout(self.read_timeout):
                     return getattr(client, fn)(*args)
 
@@ -212,7 +253,7 @@ class MultiThriftClient(object):
         self.clients = {}
         self.error_types = [gevent.Timeout, socket.error,
                             TTransport.TTransportException]
-        self.retryable_errors = self.error_types + [OpenCircuitError]
+        self.retryable_errors = self.error_types + [CircuitOpenError]
         self.client_factory = lambda (host, port): ThriftClient(clock,
             log.getChild('%s:%d' % (host, port)), host, port, client_class,
             pool_timeout=pool_timeout, connect_timeout=connect_timeout,

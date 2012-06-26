@@ -26,33 +26,6 @@ from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
 
-class TGEventServer(TServer):
-    """Gevent socket server."""
-
-    def serve(self):
-        self.serverTransport.listen()
-        while True:
-            client = self.serverTransport.accept()
-            gevent.spawn(self._process_socket, client)
-
-    def _process_socket(self, client):
-        """A greenlet for handling a single client."""
-        itrans = self.inputTransportFactory.getTransport(client)
-        otrans = self.outputTransportFactory.getTransport(client)
-        iprot = self.inputProtocolFactory.getProtocol(itrans)
-        oprot = self.outputProtocolFactory.getProtocol(otrans)
-        try:
-            while True:
-                self.processor.process(iprot, oprot)
-        except TTransportException:
-            pass
-        except Exception:
-            pass
-
-        itrans.close()
-        otrans.close()
-
-
 class ThriftServer(StreamServer):
     """Thrift server based on StreamServer."""
 
@@ -62,9 +35,9 @@ class ThriftServer(StreamServer):
         StreamServer.__init__(self, listener, self._process_socket, **kwargs)
         self.processor = processor
         self.inputTransportFactory = (inputTransportFactory
-            or TTransport.TTransportFactoryBase())
+            or TTransport.TFramedTransportFactory())
         self.outputTransportFactory = (outputTransportFactory
-            or TTransport.TTransportFactoryBase())
+            or TTransport.TFramedTransportFactory())
         self.inputProtocolFactory = (inputProtocolFactory
             or TBinaryProtocol.TBinaryProtocolFactory())
         self.outputProtocolFactory = (outputProtocolFactory

@@ -16,4 +16,4 @@
 from .curator import service_client, ServiceDiscovery
 from .client import MultiThriftClient, ThriftClient, UnavailableError
 from .server import ThriftServer
-from .wrap import ClientInvocationWrapper, wrap as wrap_client
+from .wrapper import ClientInvocationWrapper, wrap as wrap_client
