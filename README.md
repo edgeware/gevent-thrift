@@ -127,8 +127,16 @@ If you also want the build-on circuit breaker to be triggered on these
 errors you will have to call `client.handle_errors` with the same
 error list.
 
-## Writing a Server ##
+## Thrift Server ##
 
-TBD
+Starting a Thrift server is as simple as creating a `ThriftServer`
+object and call `start` on it:
 
+    impl = CalculatorImpl()
+    server = ThriftServer(('', 9090), CalculatorProcessor(impl))
+    server.start()
 
+`CalculatorProcessor` is the Thrift generated processor class and
+`impl` is our implementation of the service.  *ThriftService* inherits
+`gevent.StreamServer` which mean that you can pass in `spawn` and
+the other keyword arguments to control the server.
