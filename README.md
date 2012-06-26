@@ -137,6 +137,6 @@ object and call `start` on it:
     server.start()
 
 `CalculatorProcessor` is the Thrift generated processor class and
-`impl` is our implementation of the service.  *ThriftService* inherits
+`impl` is our implementation of the service.  *ThriftServer* inherits
 `gevent.StreamServer` which mean that you can pass in `spawn` and
 the other keyword arguments to control the server.
