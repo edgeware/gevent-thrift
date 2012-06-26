@@ -1,2 +1,4 @@
-recursive-include *.py
+recursive-include examples *.py
+recursive-include gevent_thrift *.py
 include README.md
+include versioneer.py

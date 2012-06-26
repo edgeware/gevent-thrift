@@ -23,4 +23,5 @@ setup(name='gevent-thrift',
       author_email='johan.rydberg@gmail.com',
       url='https://github.com/edgeware/gevent-thrift',
       packages=['gevent_thrift'],
+      require_install=['python-circuit'],
       cmdclass=commands)
