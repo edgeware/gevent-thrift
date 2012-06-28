@@ -15,14 +15,24 @@
 
 """Functionality for communicating with remote services."""
 
-from gevent.queue import Queue, Empty, Full
+from gevent.queue import Queue, Empty
 from gevent import socket
 import gevent
+import logging
 
 from circuit import CircuitBreaker, CircuitOpenError
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TTransport, TSocket
+
+
+# Logger object in 2.6 do not have getChild.
+def _getChild(log, suffix):
+    if hasattr(log, 'getChild'):
+        return log.getChild(suffix)
+    else:
+        return logging.getLogger('%s.%s' % (log.name,
+                                            suffix))
 
 
 class UnavailableError(Exception):
@@ -251,11 +261,12 @@ class MultiThriftClient(object):
         self.clock = clock
         self.endpoints = endpoints
         self.clients = {}
+        self.log = log
         self.error_types = [gevent.Timeout, socket.error,
                             TTransport.TTransportException]
         self.retryable_errors = self.error_types + [CircuitOpenError]
-        self.client_factory = lambda (host, port): ThriftClient(clock,
-            log.getChild('%s:%d' % (host, port)), host, port, client_class,
+        self.client_factory = lambda host, port: ThriftClient(clock,
+            _getChild(log, ('%s:%d' % (host, port))), host, port, client_class,
             pool_timeout=pool_timeout, connect_timeout=connect_timeout,
             read_timeout=read_timeout, psize=psize, maxfail=maxfail,
             reset_timeout=reset_timeout, time_unit=time_unit,
@@ -279,12 +290,14 @@ class MultiThriftClient(object):
 
     def reap(self):
         """Go through and reap clients that are no longer used."""
-        now = self.clock()
-        for key, timestamp in self.timestamps.items()[:]:
-            if (timestamp + self.idle_timeout) < now:
-                client = self.clients.pop(key)
-                del self.timestamps[key]
-                client.close()
+        while True:
+            now = self.clock()
+            for key, timestamp in self.timestamps.items()[:]:
+                if (timestamp + self.idle_timeout) < now:
+                    client = self.clients.pop(key)
+                    del self.timestamps[key]
+                    client.close()
+            gevent.sleep(10)
 
     def close(self):
         """Shut down the client."""
@@ -304,7 +317,6 @@ class MultiThriftClient(object):
             if client is None:
                 self.clients[(host, port)] = client = self.client_factory(
                     host, port)
-
             try:
                 self.timestamps[(host, port)] = self.clock()
                 return client.call_remote(fn, *args)

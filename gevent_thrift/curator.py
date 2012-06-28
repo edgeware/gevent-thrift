@@ -22,8 +22,27 @@ Currently we do not support SSL.  Patches are welcome.
 """
 
 import os.path
+import random
+import json
+import logging
+
+try:
+    from gevent_zookeeper.monitor import MonitorListener
+except ImportError:
+    # So the user do not have gevent-zookeeper installed.  Bad for
+    # them.
+    pass
 
 from .client import MultiThriftClient
+
+
+# Logger object in 2.6 do not have getChild.
+def _getChild(log, suffix):
+    if hasattr(log, 'getChild'):
+        return log.getChild(suffix)
+    else:
+        return logging.getLogger('%s.%s' % (log.name,
+                                            suffix))
 
 
 class ServiceInstance(object):
@@ -54,7 +73,22 @@ class ServiceInstance(object):
         """Return a string representation of this instance."""
         return "<ServiceInstance name=%s id=%s address=%s port=%d>" % (
             self.name, self.id, self.address, self.port)
-    __str__ = __repr__
+
+    def __str__(self):
+        return '%s at %s:%d' % (self.id, self.address, self.port)
+
+
+class _CacheLogMonitor(MonitorListener):
+    """Monitor that logs cache updates."""
+
+    def __init__(self, log):
+        self.log = log
+
+    def created(self, path, data):
+        self.log.info("discovered %s" % (data,))
+
+    def deleted(self, path):
+        self.log.info("lost %s" % (path,))
 
 
 class _Cache(object):
@@ -65,15 +99,17 @@ class _Cache(object):
     should call C{close}.
     """
 
-    def __init__(self, client, path, cls):
+    def __init__(self, client, log, path, cls):
         self.client = client
         self.path = path
         self.cls = cls
+        self.log = log
         self._instances = {}
 
     def start(self):
         self.monitor = self.client.monitor().children().store_into(
-            self._instances, self.cls.from_data).for_path(self.path)
+            self._instances, self.cls.from_data).using(_CacheLogMonitor(
+                self.log)).for_path(self.path)
         return self
 
     def close(self):
@@ -98,15 +134,16 @@ class _Discovery(object):
         and return an instance.
     """
 
-    def __init__(self, client, base_path, cls):
+    def __init__(self, client, log, base_path, cls):
         self.client = client
         self.base_path = base_path
         self.cls = cls
+        self.log = log
 
     def cache_for_name(self, name):
         """Return an instance cache for C{name}."""
-        return _Cache(self.client, os.path.join(self.base_path, name),
-            self.cls).start()
+        return _Cache(self.client, _getChild(self.log, 'cache.' + name),
+                      os.path.join(self.base_path, name), self.cls).start()
 
     def query_for_names(self):
         """Return names."""
@@ -138,8 +175,8 @@ class _Discovery(object):
 class ServiceDiscovery(_Discovery):
     """Discovery for services."""
 
-    def __init__(self, client):
-        Discovery.__init__(self, client, '/service', ServiceInstance)
+    def __init__(self, client, log):
+        _Discovery.__init__(self, client, log, '/service', ServiceInstance)
 
 
 def service_client(clock, log, cache, client_class, **kwargs):
@@ -153,7 +190,9 @@ def service_client(clock, log, cache, client_class, **kwargs):
     @return: a L{MultiThriftClient}.
     """
     def endpoints():
-        for instance in cache.instances():
+        instances = list(cache.instances())
+        random.shuffle(instances)
+        for instance in instances:
             yield instance.address, instance.port
 
     return MultiThriftClient(clock, log, endpoints, client_class,
