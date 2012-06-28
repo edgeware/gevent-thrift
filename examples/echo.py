@@ -32,7 +32,8 @@ class CalculatorImpl(object):
 
 def test():
     impl = CalculatorImpl()
-    server = ThriftServer(('', 9090), CalculatorProcessor(impl))
+    server = ThriftServer(('', 9090), logging.getLogger('server'),
+        CalculatorProcessor(impl))
     server.start()
 
     client = wrap_client(ThriftClient(time.time, logging.getLogger('calc'),

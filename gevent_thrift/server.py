@@ -17,11 +17,9 @@
 
 Based on gist by imlucas: https://gist.github.com/361144"""
 
-import gevent
 from gevent.server import StreamServer
 
-from thrift.server.TServer import TServer
-from thrift.transport.TTransport import TTransportException, TFileObjectTransport
+from thrift.transport.TTransport import TFileObjectTransport
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
@@ -29,11 +27,12 @@ from thrift.protocol import TBinaryProtocol
 class ThriftServer(StreamServer):
     """Thrift server based on StreamServer."""
 
-    def __init__(self, listener, processor, inputTransportFactory=None,
+    def __init__(self, listener, log, processor, inputTransportFactory=None,
                  outputTransportFactory=None, inputProtocolFactory=None,
                  outputProtocolFactory=None, **kwargs):
         StreamServer.__init__(self, listener, self._process_socket, **kwargs)
         self.processor = processor
+        self.log = log
         self.inputTransportFactory = (inputTransportFactory
             or TTransport.TFramedTransportFactory())
         self.outputTransportFactory = (outputTransportFactory
@@ -53,12 +52,9 @@ class ThriftServer(StreamServer):
         try:
             while True:
                 self.processor.process(iprot, oprot)
-        except TTransportException:
-            pass
-        except EOFError:
-            pass
-        except Exception, err:
-            print "Oops", repr(err), err.__class__
+        except Exception:
+            self.log.exception('exception while processing request'
+                               + ' - closing connection')
 
         itrans.close()
         otrans.close()

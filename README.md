@@ -133,7 +133,8 @@ Starting a Thrift server is as simple as creating a `ThriftServer`
 object and call `start` on it:
 
     impl = CalculatorImpl()
-    server = ThriftServer(('', 9090), CalculatorProcessor(impl))
+    server = ThriftServer(('', 9090), logging.getLogger('calc.server'),
+        CalculatorProcessor(impl))
     server.start()
 
 `CalculatorProcessor` is the Thrift generated processor class and
