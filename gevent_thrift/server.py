@@ -55,10 +55,11 @@ class TGEventServer(TServer):
 class ThriftServer(StreamServer):
     """Thrift server based on StreamServer."""
 
-    def __init__(self, listener, processor, inputTransportFactory=None,
+    def __init__(self, log, listener, processor, inputTransportFactory=None,
                  outputTransportFactory=None, inputProtocolFactory=None,
                  outputProtocolFactory=None, **kwargs):
         StreamServer.__init__(self, listener, self._process_socket, **kwargs)
+        self.log = log
         self.processor = processor
         self.inputTransportFactory = (inputTransportFactory
             or TTransport.TTransportFactoryBase())
@@ -79,12 +80,11 @@ class ThriftServer(StreamServer):
         try:
             while True:
                 self.processor.process(iprot, oprot)
-        except TTransportException:
-            pass
         except EOFError:
             pass
         except Exception, err:
-            print "Oops", repr(err), err.__class__
+            self.log.exception(
+                "caught exception while processing thrift request")
 
         itrans.close()
         otrans.close()
