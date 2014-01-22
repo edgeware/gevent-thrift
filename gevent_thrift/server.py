@@ -62,9 +62,9 @@ class ThriftServer(StreamServer):
         self.log = log
         self.processor = processor
         self.inputTransportFactory = (inputTransportFactory
-            or TTransport.TTransportFactoryBase())
+            or TTransport.TFramedTransportFactory())
         self.outputTransportFactory = (outputTransportFactory
-            or TTransport.TTransportFactoryBase())
+            or TTransport.TFramedTransportFactory())
         self.inputProtocolFactory = (inputProtocolFactory
             or TBinaryProtocol.TBinaryProtocolFactory())
         self.outputProtocolFactory = (outputProtocolFactory
