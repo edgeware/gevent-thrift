@@ -10,8 +10,8 @@ kwargs = {
     'url': 'https://github.com/edgeware/gevent-thrift',
     'packages': ['gevent_thrift'],
     'install_requires': [
-        'gevent==0.13.8',
-        'thrift'
+        'gevent==1.0',
+        'thrift==0.8.0'
     ]
 }
 
