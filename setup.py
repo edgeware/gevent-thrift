@@ -5,8 +5,8 @@ kwargs = {
     'name': 'gevent-thrift',
     'version': '0.1',
     'description': 'gevent bindings for Thrift',
-    'author': 'Johan Rydberg',
-    'author_email': 'johan.rydberg@gmail.com',
+    'author': 'Edgeware AB',
+    'author_email': 'info@edgeware.tv',
     'url': 'https://github.com/edgeware/gevent-thrift',
     'packages': ['gevent_thrift'],
     'install_requires': [
