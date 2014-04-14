@@ -2,7 +2,7 @@
 from setuptools import setup
 
 setup(name='gevent-thrift',
-      version='0.1',
+      version='0.2',
       description='Gevent bindings for Thrift',
       author='Edgeware AB',
       author_email='info@edgeware.tv',
