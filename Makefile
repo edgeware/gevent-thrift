@@ -11,7 +11,9 @@ frosted:
 	frosted -vb -r gevent_thrift
 
 test:
-	python setup.py test
+	# Currently doesn't contain any tests, so we skip it for now so we don't
+	# waste time compiling Gevent for nothing.
+	# python setup.py test
 
 build:
 
