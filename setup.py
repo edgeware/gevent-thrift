@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-
-from distutils.core import setup
+from setuptools import setup
 
 setup(name='gevent-thrift',
-      version='0.0',
-      description='gevent bindings for Thrift',
-      author='Johan Rydberg',
-      author_email='johan.rydberg@gmail.com',
+      version='0.1',
+      description='Gevent bindings for Thrift',
+      author='Edgeware AB',
+      author_email='info@edgeware.tv',
       url='https://github.com/edgeware/gevent-thrift',
-      packages=['gevent_thrift']
-     )
+      packages=['gevent_thrift'],
+      install_requires=[
+          'gevent==1.0',
+          'thrift==0.8.0'
+      ])
