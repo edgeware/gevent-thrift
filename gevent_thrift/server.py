@@ -20,7 +20,8 @@ import gevent
 from gevent.server import StreamServer
 
 from thrift.server.TServer import TServer
-from thrift.transport.TTransport import TTransportException, TFileObjectTransport
+from thrift.transport.TTransport import (TTransportException,
+                                         TFileObjectTransport)
 from thrift.transport import TTransport
 from thrift.protocol import TBinaryProtocol
 
@@ -82,7 +83,7 @@ class ThriftServer(StreamServer):
                 self.processor.process(iprot, oprot)
         except EOFError:
             pass
-        except Exception, err:
+        except Exception:
             self.log.exception(
                 "caught exception while processing thrift request")
 
