@@ -10,5 +10,5 @@ setup(name='gevent-thrift',
       packages=['gevent_thrift'],
       install_requires=[
           'gevent==1.0',
-          'thrift==0.8.0'
+          'thrift==0.9.2'
       ])
