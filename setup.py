@@ -9,6 +9,6 @@ setup(name='gevent-thrift',
       url='https://github.com/edgeware/gevent-thrift',
       packages=['gevent_thrift'],
       install_requires=[
-          'gevent==1.0',
+          'gevent==1.0.1',
           'thrift==0.9.2'
       ])
